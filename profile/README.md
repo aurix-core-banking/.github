@@ -46,49 +46,63 @@ A Aurix é dividida em repositórios independentes, cada um responsável por uma
 
 ## Arquitetura
 
+```mermaid
+graph TB
+    EXT["🌐 Externo<br/>(BACEN / Receptor)"]
+    GW["<b>API Gateway</b><br/>Traefik · /api/*"]
+
+    subgraph BACKEND ["14 Microserviços · Java 25 · Spring Boot 4.1.0"]
+        direction LR
+        B1["svc-banking<br/>:<i>8200</i>"]
+        B2["svc-payments<br/>:<i>8201</i>"]
+        B3["svc-credit<br/>:<i>8082</i>"]
+        B4["svc-customer<br/>:<i>8083</i>"]
+        B5["svc-cards<br/>:<i>8094</i>"]
+        B6["svc-products<br/>:<i>8084</i>"]
+        B7["svc-compliance<br/>:<i>8205</i>"]
+        B8["svc-platform<br/>:<i>8092</i>"]
+        B9["svc-intelligence<br/>:<i>8091</i>"]
+        B10["svc-finance-mgmt<br/>:<i>8089</i>"]
+        B11["svc-ai<br/>:<i>8206</i>"]
+        B12["svc-fraud<br/>:<i>8207</i>"]
+        B13["svc-contracts<br/>:<i>8085</i>"]
+        B14["svc-cambio<br/>:<i>8093</i>"]
+    end
+
+    subgraph OPENFINANCE ["svc-openfinance · :<i>8096</i>"]
+        direction TB
+        KF["Kafka Consumers<br/><code>core.conta.criada.v1</code><br/><code>core.transacao.realizada.v1</code><br/><code>cartoes.transacao.autorizada.v1</code><br/><code>customer.cliente.criado.v1</code>"]
+        REPLICAS["Réplicas Isoladas<br/>Filtros por consentimento"]
+        CLEANUP["@Scheduled<br/>Expira consentimentos<br/>(1h)"]
+        OFAPI["REST API<br/>FAPI-Brazil<br/>Fase 1 · 2 · 3"]
+        DB_OF[("PostgreSQL<br/><code>aurix_openfinance</code>")]
+    end
+
+    EXT <-->|"REST<br/>banco receptor"| GW
+    GW -->|"REST (norte-sul)"| BACKEND
+    BACKEND -->|"Kafka (leste-oeste)<br/>eventos de domínio"| KF
+    KF --> REPLICAS
+    REPLICAS --> DB_OF
+    CLEANUP --> DB_OF
+    OFAPI <--> DB_OF
+    GW -->|"REST<br/><code>/open-finance/*</code>"| OFAPI
 ```
-┌─────────────────────────────────────────────────────────────────┐
-│                        API Gateway (Traefik)                     │
-│                     /api/* → roteamento por serviço               │
-└─────────┬───────────────────────────────────────────┬───────────┘
-          │ REST (norte-sul)                          │
-┌─────────▼───────────────────────────────────────────▼───────────┐
-│                                                                   │
-│  svc-banking ──┐   svc-payments ─┐   svc-credit ─┐               │
-│  svc-customer ─┤   svc-cards ────┤   svc-cambio ─┤               │
-│  svc-fraud ────┤   svc-platform ─┤   svc-ai ─────┤  14 serviços │
-│  svc-compliance┤   svc-products ─┤   svc-contracts┤               │
-│  svc-intelligence  svc-finance-mgmt              │               │
-│                                                                   │
-└──────────────────────────┬──────────────────────────────────────┘
-                           │ Kafka (leste-oeste, eventos de domínio)
-                           │ Topics: core.conta.criada.v1,
-                           │         core.transacao.realizada.v1,
-                           │         cartoes.transacao.autorizada.v1,
-                           │         contracts.contrato.assinado.v1, ...
-                           ▼
-┌─────────────────────────────────────────────────────────────────┐
-│                     svc-openfinance (porta 8096)                 │
-│                                                                   │
-│  Kafka Consumer → filtra por consentimentos ativos                │
-│                 → escreve em réplicas isoladas                    │
-│                 → expira e limpa dados automaticamente            │
-│                                                                   │
-│  APIs REST: /open-finance/v1/consents                             │
-│             /open-finance/v1/accounts                             │
-│             /open-finance/v1/accounts/{id}/transactions           │
-│             /open-finance/v1/credit-cards (Fase 2)                │
-│                                                                   │
-│  PostgreSQL: aurix_openfinance (réplica isolada do core)          │
-└──────────────────────────┬──────────────────────────────────────┘
-                           │ REST (banco receptor consulta)
-                           ▼
-                    ┌──────────────┐
-                    │  Externo     │
-                    │  (BACEN /    │
-                    │   receptor)  │
-                    └──────────────┘
-```
+
+### Fluxo de dados
+
+1. **Ingestão**: `svc-banking`, `svc-cards`, `svc-customer` publicam eventos Kafka no formato `<domínio>.<entidade>.<evento>.<versao>`
+2. **Consumo**: `svc-openfinance` consome os eventos e filtra por consentimentos ativos
+3. **Replicação**: Dados são escritos em tabelas isoladas (`aurix_openfinance`), nunca acessa o core banking diretamente
+4. **Consulta**: Banco receptor consulta via REST FAPI-Brazil com token de consentimento
+5. **Limpeza**: Job `@Scheduled` expira consentimentos e apaga réplicas (a cada 1h)
+
+### Open Finance Brasil
+
+| Fase | Escopo | Status |
+|---|---|---|
+| **Fase 1** | Contas, transações, saldos, consentimento, dados pessoais | ✅ Implementado |
+| **Fase 2** | Cartões de crédito, faturas, transações de cartão | ✅ Implementado |
+| **Fase 3** | Empréstimos, seguros, Pix | ✅ Implementado |
 
 ## Stack
 
