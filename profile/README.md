@@ -1,8 +1,11 @@
 # Aurix Core Banking
 
-[![Backend CI](https://github.com/aurix-core-banking/aurix-core-banking/actions/workflows/backend-ci.yml/badge.svg)](https://github.com/aurix-core-banking/aurix-core-banking/actions/workflows/backend-ci.yml)
-[![Frontend CI](https://github.com/aurix-core-banking/aurix-core-banking/actions/workflows/frontend-ci.yml/badge.svg)](https://github.com/aurix-core-banking/aurix-core-banking/actions/workflows/frontend-ci.yml)
-[![Infrastructure](https://github.com/aurix-core-banking/aurix-core-banking/actions/workflows/terraform-plan.yml/badge.svg)](https://github.com/aurix-core-banking/aurix-core-banking/actions/workflows/terraform-plan.yml)
+[![Backend](https://img.shields.io/badge/backend-java%2025%20%7C%20spring%20boot%204.1.0-blue)](https://github.com/aurix-core-banking/aurix-backend)
+[![Frontend](https://img.shields.io/badge/frontend-react%2018%20%7C%20MUI%20v5-61dafb)](https://github.com/aurix-core-banking/aurix-frontend)
+[![Open Finance](https://img.shields.io/badge/open%20finance-BACEN%20Fase%201-00b945)](https://github.com/aurix-core-banking/aurix-openfinance)
+[![Infrastructure](https://img.shields.io/badge/infra-terraform%20%7C%20kubernetes%20%7C%20docker-purple)](https://github.com/aurix-core-banking/aurix-infrastructure)
+[![Tests](https://img.shields.io/badge/tests-playwright%20%7C%20REST%20Assured%20%7C%20k6-orange)](https://github.com/aurix-core-banking/aurix-tests)
+[![ML](https://img.shields.io/badge/ml-xgboost%20%7C%20MLflow%20%7C%20FastAPI-red)](https://github.com/aurix-core-banking/aurix-ml)
 
 ---
 
