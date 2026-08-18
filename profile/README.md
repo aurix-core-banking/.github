@@ -149,18 +149,48 @@ O `aurix-openfinance` implementa as APIs do **Open Finance Brasil** (BACEN) segu
 
 | Fase | Escopo | Status |
 |---|---|---|
-| **Fase 1** | Contas, transações, saldos, consentimento | ✅ Implementado |
+| **Fase 1** | Contas, transações, saldos, consentimento, dados pessoais (identificação, endereços, contatos) | ✅ Implementado |
 | **Fase 2** | Cartões de crédito | 🚧 Placeholder |
 | **Fase 3** | Pix, empréstimos, seguros | 📋 Planejado |
 
-**Fluxo de dados:**
-1. Usuário autoriza consentimento via `/open-finance/v1/consents`
-2. `svc-openfinance` consome eventos Kafka do core banking (contas, transações, cartões)
-3. Dados são filtrados por consentimentos ativos e armazenados em réplicas isoladas
-4. Banco receptor consulta via REST — nunca acessa o core banking diretamente
-5. Consentimentos expiram automaticamente e dados são limpos (job a cada 1h)
+### Fase 1 — Endpoints
 
-**Porta:** `8096` · **OpenAPI:** `/swagger-ui.html` · **Spec:** `openapi/aurix-openfinance.yaml`
+| Domínio | Endpoints | Kafka Consumers |
+|---|---|---|
+| Consentimento | `POST /consents`, `GET /consents/{id}`, `POST .../authorise`, `POST .../reject`, `POST .../revoke` | — |
+| Contas | `GET /accounts`, `GET /accounts/{id}`, `GET /accounts/{id}/balances` | `core.conta.criada.v1`, `core.conta.atualizada.v1` |
+| Transações | `GET /accounts/{id}/transactions` | `core.transacao.realizada.v1`, `core.transacao.liquidada.v1` |
+| Dados pessoais | `GET /customers/personal/identifications`, `.../addresses`, `.../phone-numbers`, `.../email`, `GET /customers/business/identifications`, `.../addresses` | `customer.cliente.criado.v1`, `customer.cliente.atualizado.v1` |
+| Cartões | `GET /credit-cards` (Fase 2) | `cartoes.transacao.autorizada.v1` |
+
+### Fluxo de dados
+
+```
+svc-banking / svc-cards / svc-customer
+         │ Kafka events
+         ▼
+  svc-openfinance (consumidor)
+         │ filtra por consentimentos ativos
+         │ escreve em réplicas isoladas
+         ▼
+  PostgreSQL (aurix_openfinance)
+         │
+         ▼ REST (banco receptor consulta)
+  Externo (BACEN / receptor)
+```
+
+### Infraestrutura
+
+| Componente | Configuração |
+|---|---|
+| Porta | `8096` |
+| Docker Compose | `svc-openfinance` com health check |
+| Traefik | Rota `/open-finance/*` → `svc-openfinance:8096` |
+| Prometheus | Scrape config em `monitoring/prometheus.yml` |
+| Helm | `kubernetes/charts/svc-openfinance` (deployment, service, hpa, pdb) |
+| OpenAPI | `/swagger-ui.html` · Spec: `openapi/aurix-openfinance.yaml` |
+| Flyway | V1 (consentimento, contas, transações) + V2 (pessoas) |
+| Limpeza | `@Scheduled` expira consentimentos + apaga réplicas (1h) |
 
 ## Documentação
 
